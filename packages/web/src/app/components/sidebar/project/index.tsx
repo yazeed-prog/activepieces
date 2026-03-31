@@ -51,12 +51,23 @@ const ProjectSideBarItem = ({
   return (
     <SidebarMenuButton
       onClick={() => handleProjectSelect(project.id)}
-      className={cn('', {
-        'bg-sidebar-accent! ': isCurrentProject,
+      className={cn({
+        'bg-sidebar-accent!': isCurrentProject,
       })}
     >
       {projectAvatar}
-      {!isCollapsed && <span className={cn('truncate', isCurrentProject ? 'font-semibold text-foreground' : 'font-normal text-sidebar-accent-foreground')}>{displayText}</span>}
+      {!isCollapsed && (
+        <span
+          className={cn(
+            'truncate',
+            isCurrentProject
+              ? 'font-semibold text-foreground'
+              : 'font-normal text-sidebar-accent-foreground',
+          )}
+        >
+          {displayText}
+        </span>
+      )}
     </SidebarMenuButton>
   );
 };
