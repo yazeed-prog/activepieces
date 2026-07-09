@@ -26,10 +26,23 @@ import { cn } from '@/lib/utils';
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH = '14.375rem';
+const SIDEBAR_WIDTH_STORAGE_KEY = 'sidebar_width';
+const SIDEBAR_DEFAULT_WIDTH_PX = 256;
+// Dragging below 60% of the default width closes the sidebar entirely.
+const SIDEBAR_MIN_WIDTH_PX = Math.round(SIDEBAR_DEFAULT_WIDTH_PX * 0.6);
+// Default --sidebar-width (256px) + edge margin — the hover-keep column for the
+// offcanvas hover panel; the pointer anywhere in this column keeps it open.
+const SIDEBAR_HOVER_COLUMN_WIDTH_PX = 272;
+const SIDEBAR_EDGE_GLOW_WIDTH_PX = 40;
+// Covers the 200ms collapse transition during which the header menu button
+// sweeps under the cursor and would re-trigger hover-open.
+const SIDEBAR_HOVER_SUPPRESS_AFTER_CLOSE_MS = 400;
 const SIDEBAR_WIDTH_MOBILE = '18rem';
 const SIDEBAR_WIDTH_ICON = '3rem';
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
+// Survives route changes (which remount the provider) so an open hover panel
+// stays open while navigating through it.
+let lastHoverState = false;
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
@@ -59,8 +72,12 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
-  const [isHovered, setIsHovered] = React.useState(false);
+  // Seeded from a module-level flag: route changes remount the whole layout
+  // (each route owns its provider instance), and the hover-revealed panel must
+  // survive in-panel navigation instead of vanishing on every page switch.
+  const [isHovered, setIsHovered] = React.useState(() => lastHoverState);
   const [keepElevatedZIndex, setKeepElevatedZIndex] = React.useState(false);
+  const hoverSuppressedUntilRef = React.useRef(0);
 
   const [_open, _setOpen] = React.useState(() => {
     if (typeof window !== 'undefined') {
@@ -71,6 +88,23 @@ function SidebarProvider({
     }
     return defaultOpen;
   });
+  const [sidebarWidth, setSidebarWidthState] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = Number(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
+      if (
+        stored >= SIDEBAR_MIN_WIDTH_PX &&
+        stored <= SIDEBAR_DEFAULT_WIDTH_PX
+      ) {
+        return stored;
+      }
+    }
+    return SIDEBAR_DEFAULT_WIDTH_PX;
+  });
+  const [isResizing, setIsResizing] = React.useState(false);
+
+  const setSidebarWidth = React.useCallback((width: number) => {
+    setSidebarWidthState(clampSidebarWidth(width));
+  }, []);
   const persistedOpen = openProp ?? _open;
 
   const isHoverExpanded = hoverMode && !persistedOpen && isHovered;
@@ -87,6 +121,16 @@ function SidebarProvider({
         _setOpen(openState);
       }
 
+      // Pinning/unpinning is a deliberate action — drop any lingering hover
+      // state so closing never instantly reopens the sidebar as a hover panel.
+      lastHoverState = false;
+      setIsHovered(false);
+      setKeepElevatedZIndex(false);
+      if (!openState) {
+        hoverSuppressedUntilRef.current =
+          Date.now() + SIDEBAR_HOVER_SUPPRESS_AFTER_CLOSE_MS;
+      }
+
       localStorage.setItem(SIDEBAR_COOKIE_NAME, String(openState));
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
     },
@@ -101,6 +145,10 @@ function SidebarProvider({
   );
 
   const setHovered = React.useCallback((hovered: boolean) => {
+    if (hovered && Date.now() < hoverSuppressedUntilRef.current) {
+      return;
+    }
+    lastHoverState = hovered;
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
@@ -167,6 +215,9 @@ function SidebarProvider({
       isHoverExpanded,
       shouldElevateZIndex,
       setHovered,
+      setSidebarWidth,
+      isResizing,
+      setIsResizing,
     }),
     [
       state,
@@ -180,6 +231,8 @@ function SidebarProvider({
       hoverMode,
       isHoverExpanded,
       setHovered,
+      setSidebarWidth,
+      isResizing,
     ],
   );
 
@@ -190,7 +243,7 @@ function SidebarProvider({
           data-slot="sidebar-wrapper"
           style={
             {
-              '--sidebar-width': SIDEBAR_WIDTH,
+              '--sidebar-width': `${sidebarWidth}px`,
               '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
               ...style,
             } as React.CSSProperties
@@ -212,6 +265,7 @@ function Sidebar({
   side = 'left',
   variant = 'sidebar',
   collapsible = 'offcanvas',
+  resizable = false,
   className,
   children,
   ...props
@@ -219,6 +273,7 @@ function Sidebar({
   side?: 'left' | 'right';
   variant?: 'sidebar' | 'floating' | 'inset';
   collapsible?: 'offcanvas' | 'icon' | 'none';
+  resizable?: boolean;
 }) {
   const {
     isMobile,
@@ -230,7 +285,95 @@ function Sidebar({
     isHoverExpanded,
     shouldElevateZIndex,
     setHovered,
+    isResizing,
   } = useSidebar();
+
+  // Offcanvas hover-reveal: the closed sidebar opens as a short floating panel
+  // (shadow, no layout space) while the pointer is over the left edge or the
+  // panel itself. Closing is delayed so the panel slides out fully rendered —
+  // flipping the state to collapsed immediately would unmount labels/sections
+  // and make the panel visibly shrink mid-animation.
+  const isOffcanvasHoverPanel =
+    hoverMode && collapsible === 'offcanvas' && isHoverExpanded;
+  const [isHoverClosing, setIsHoverClosing] = React.useState(false);
+  const hoverCloseTimeoutRef = React.useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (hoverCloseTimeoutRef.current) {
+        clearTimeout(hoverCloseTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleHoverEnter = () => {
+    if (hoverCloseTimeoutRef.current) {
+      clearTimeout(hoverCloseTimeoutRef.current);
+      hoverCloseTimeoutRef.current = null;
+    }
+    setIsHoverClosing(false);
+    setHovered(true);
+  };
+
+  // Only used for icon-mode hover (builder rail). Offcanvas hover opens solely
+  // from the screen-edge strip, and closing is driven by the mousemove effect
+  // below: the whole edge column (above/below the panel too) counts as inside.
+  const handleHoverLeave = () => {
+    setHovered(false);
+  };
+
+  const [isEdgeGlow, setIsEdgeGlow] = React.useState(false);
+  const edgeGlowActive =
+    hoverMode &&
+    collapsible === 'offcanvas' &&
+    state === 'collapsed' &&
+    !isHoverExpanded;
+
+  React.useEffect(() => {
+    if (!edgeGlowActive) {
+      setIsEdgeGlow(false);
+      return;
+    }
+    const handleMouseMove = (event: MouseEvent) => {
+      const distanceFromEdge =
+        side === 'left' ? event.clientX : window.innerWidth - event.clientX;
+      setIsEdgeGlow(distanceFromEdge <= SIDEBAR_EDGE_GLOW_WIDTH_PX);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [edgeGlowActive, side]);
+
+  React.useEffect(() => {
+    if (!isOffcanvasHoverPanel) {
+      return;
+    }
+    const handleMouseMove = (event: MouseEvent) => {
+      const inColumn =
+        side === 'left'
+          ? event.clientX <= SIDEBAR_HOVER_COLUMN_WIDTH_PX
+          : event.clientX >= window.innerWidth - SIDEBAR_HOVER_COLUMN_WIDTH_PX;
+      if (inColumn) {
+        if (hoverCloseTimeoutRef.current) {
+          clearTimeout(hoverCloseTimeoutRef.current);
+          hoverCloseTimeoutRef.current = null;
+        }
+        setIsHoverClosing(false);
+        return;
+      }
+      if (!hoverCloseTimeoutRef.current) {
+        setIsHoverClosing(true);
+        hoverCloseTimeoutRef.current = setTimeout(() => {
+          hoverCloseTimeoutRef.current = null;
+          setIsHoverClosing(false);
+          setHovered(false);
+        }, 200);
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [isOffcanvasHoverPanel, side, setHovered]);
 
   if (collapsible === 'none') {
     return (
@@ -280,21 +423,54 @@ function Sidebar({
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
-      onMouseEnter={hoverMode ? () => setHovered(true) : undefined}
-      onMouseLeave={hoverMode ? () => setHovered(false) : undefined}
+      onMouseEnter={
+        hoverMode && collapsible !== 'offcanvas' ? handleHoverEnter : undefined
+      }
+      onMouseLeave={
+        hoverMode && collapsible !== 'offcanvas' ? handleHoverLeave : undefined
+      }
     >
+      {hoverMode &&
+        collapsible === 'offcanvas' &&
+        (state === 'collapsed' || isHoverExpanded) && (
+          <div
+            data-slot="sidebar-hover-zone"
+            aria-hidden="true"
+            onMouseEnter={handleHoverEnter}
+            className={cn(
+              'fixed inset-y-0 z-40 hidden w-1.5 md:block',
+              side === 'left' ? 'left-0' : 'right-0',
+            )}
+          />
+        )}
+      {edgeGlowActive && (
+        <div
+          data-slot="sidebar-edge-glow"
+          aria-hidden="true"
+          className={cn(
+            'pointer-events-none fixed inset-y-0 z-40 hidden w-5 transition-[opacity,transform] duration-300 ease-out md:block',
+            side === 'left'
+              ? 'left-0 origin-left bg-gradient-to-r from-muted-foreground/50 to-transparent'
+              : 'right-0 origin-right bg-gradient-to-l from-muted-foreground/50 to-transparent',
+            isEdgeGlow ? 'scale-x-100 opacity-100' : 'scale-x-0 opacity-0',
+          )}
+        />
+      )}
       {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"
         className={cn(
           'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear',
+          isResizing && 'transition-none',
           'group-data-[collapsible=offcanvas]:w-0',
           'group-data-[side=right]:rotate-180',
           variant === 'floating' || variant === 'inset'
             ? 'group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]'
             : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
           isHoverExpanded &&
-            (variant === 'floating' || variant === 'inset'
+            (collapsible === 'offcanvas'
+              ? 'w-0'
+              : variant === 'floating' || variant === 'inset'
               ? 'w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]'
               : 'w-(--sidebar-width-icon)'),
         )}
@@ -302,16 +478,34 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         className={cn(
-          'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex',
-          side === 'left'
-            ? 'left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]'
-            : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',
+          'fixed z-10 hidden w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex',
+          isResizing && 'transition-none',
+          isOffcanvasHoverPanel
+            ? cn(
+                'top-1/2 -translate-y-1/2 h-[85svh] overflow-hidden rounded-lg border shadow-xl',
+                side === 'left' ? 'left-2' : 'right-2',
+                isHoverClosing &&
+                  (side === 'left'
+                    ? 'left-[calc(var(--sidebar-width)*-1)]'
+                    : 'right-[calc(var(--sidebar-width)*-1)]'),
+              )
+            : cn(
+                'inset-y-0 h-svh',
+                side === 'left'
+                  ? 'left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]'
+                  : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',
+              ),
           variant === 'floating' || variant === 'inset'
             ? 'p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
             : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
           !hoverMode && (side === 'left' ? 'border-r' : 'border-l'),
           hoverMode &&
             isHoverExpanded &&
+            !isOffcanvasHoverPanel &&
+            (side === 'left' ? 'border-r' : 'border-l'),
+          hoverMode &&
+            collapsible === 'offcanvas' &&
+            !isOffcanvasHoverPanel &&
             (side === 'left' ? 'border-r' : 'border-l'),
           !hoverMode &&
             state === 'collapsed' &&
@@ -327,6 +521,7 @@ function Sidebar({
           data-slot="sidebar-inner"
           className={cn(
             'flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow',
+            isOffcanvasHoverPanel && 'rounded-lg',
             !hoverMode &&
               state === 'collapsed' &&
               collapsible === 'icon' &&
@@ -342,8 +537,72 @@ function Sidebar({
           )}
           {children}
         </div>
+        {resizable && state === 'expanded' && !isHoverExpanded && (
+          <SidebarResizeHandle side={side} />
+        )}
       </div>
     </div>
+  );
+}
+
+function SidebarResizeHandle({ side }: { side: 'left' | 'right' }) {
+  const { setOpen, setSidebarWidth, setIsResizing } = useSidebar();
+
+  const widthFromPointer = (clientX: number) =>
+    side === 'left' ? clientX : window.innerWidth - clientX;
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsResizing(true);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    const width = widthFromPointer(event.clientX);
+    if (width < SIDEBAR_MIN_WIDTH_PX) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      setIsResizing(false);
+      setOpen(false);
+      return;
+    }
+    setSidebarWidth(width);
+  };
+
+  // The persisted width is only written on a completed drag, so a drag that
+  // ends in a close keeps the last comfortable width for the next open.
+  const handlePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    setIsResizing(false);
+    localStorage.setItem(
+      SIDEBAR_WIDTH_STORAGE_KEY,
+      String(clampSidebarWidth(widthFromPointer(event.clientX))),
+    );
+  };
+
+  return (
+    <div
+      data-slot="sidebar-resize-handle"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize Sidebar"
+      className={cn(
+        'absolute inset-y-0 z-30 w-1.5 cursor-col-resize touch-none hover:bg-sidebar-border active:bg-sidebar-border',
+        side === 'left' ? 'right-0' : 'left-0',
+      )}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+    />
+  );
+}
+
+function clampSidebarWidth(width: number): number {
+  return Math.min(
+    SIDEBAR_DEFAULT_WIDTH_PX,
+    Math.max(SIDEBAR_MIN_WIDTH_PX, width),
   );
 }
 
@@ -472,7 +731,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<'div'>) {
       data-slot="sidebar-content"
       data-sidebar="content"
       className={cn(
-        'no-scrollbar flex min-h-0 flex-1 flex-col gap-0 overflow-auto group-data-[collapsible=icon]:overflow-hidden',
+        'scrollbar-none flex min-h-0 flex-1 flex-col gap-0 overflow-auto group-data-[collapsible=icon]:overflow-hidden',
         className,
       )}
       {...props}
@@ -834,4 +1093,7 @@ type SidebarContextProps = {
   isHoverExpanded: boolean;
   shouldElevateZIndex: boolean;
   setHovered: (hovered: boolean) => void;
+  setSidebarWidth: (width: number) => void;
+  isResizing: boolean;
+  setIsResizing: (resizing: boolean) => void;
 };

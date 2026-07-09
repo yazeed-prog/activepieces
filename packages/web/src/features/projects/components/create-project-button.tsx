@@ -82,7 +82,13 @@ function IconVariant({
   );
 }
 
-function FullVariant({ disabled }: { disabled: boolean }) {
+function FullVariant({
+  disabled,
+  onCreate,
+}: {
+  disabled: boolean;
+  onCreate?: (project: ProjectWithLimits) => void;
+}) {
   if (disabled) {
     return (
       <UpgradeTooltip>
@@ -95,7 +101,7 @@ function FullVariant({ disabled }: { disabled: boolean }) {
     );
   }
   return (
-    <NewProjectDialog>
+    <NewProjectDialog onCreate={onCreate}>
       <AnimatedIconButton icon={PlusIcon} iconSize={16} size="sm">
         {t('New Project')}
       </AnimatedIconButton>
@@ -146,5 +152,5 @@ export function CreateProjectButton({
   if (variant === 'sidebar-menu') {
     return <SidebarMenuVariant disabled={disabled} onCreate={onCreate} />;
   }
-  return <FullVariant disabled={disabled} />;
+  return <FullVariant disabled={disabled} onCreate={onCreate} />;
 }

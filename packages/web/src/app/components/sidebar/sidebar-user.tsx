@@ -2,7 +2,7 @@ import { isNil } from '@activepieces/core-utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { t } from 'i18next';
 import { ChevronsUpDown, LogOut, UserCogIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { UserAvatar } from '@/components/custom/user-avatar';
 import { useEmbedding } from '@/components/providers/embed-provider';
@@ -22,6 +22,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar-shadcn';
+import { useExclusiveMenu } from '@/hooks/use-exclusive-menu';
 import { userHooks } from '@/hooks/user-hooks';
 import { authenticationSession } from '@/lib/authentication-session';
 import { cn } from '@/lib/utils';
@@ -37,6 +38,9 @@ export function SidebarUser() {
   const { reset } = useTelemetry();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  useExclusiveMenu({ id: 'sidebar-user', open: menuOpen, onClose: closeMenu });
   if (!user || embedState.isEmbedded) {
     return null;
   }
@@ -50,7 +54,7 @@ export function SidebarUser() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu modal>
+        <DropdownMenu modal open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild className="w-full">
             <SidebarMenuButton className="h-10! pl-2! group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:pl-2!">
               <div className="size-[18px] shrink-0 overflow-hidden flex items-center justify-center rounded-full">

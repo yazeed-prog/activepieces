@@ -6,24 +6,21 @@ import {
   UserStatus,
 } from '@activepieces/shared';
 import { t } from 'i18next';
-import { UsersRound, Lock } from 'lucide-react';
-import { useState } from 'react';
+import { UsersRound, Play } from 'lucide-react';
+import { ComponentType, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 
 import { AnimatedIconButton } from '@/components/custom/animated-icon-button';
 import { PageHeader } from '@/components/custom/page-header';
+import { BoxIcon } from '@/components/icons/box';
+import { FileJson2Icon } from '@/components/icons/file-json2';
 import { SettingsIcon } from '@/components/icons/settings';
+import { UnplugIcon } from '@/components/icons/unplug';
 import { UserRoundPlusIcon } from '@/components/icons/user-round-plus';
+import { WorkflowIcon } from '@/components/icons/workflow';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { InviteUserDialog, projectMembersHooks } from '@/features/members';
-import { getProjectName, projectCollectionUtils } from '@/features/projects';
-import { ApProjectDisplay } from '@/features/projects/components/ap-project-display';
+import { projectCollectionUtils } from '@/features/projects';
 import { useAuthorization } from '@/hooks/authorization-hooks';
 import { flagsHooks } from '@/hooks/flags-hooks';
 import { platformHooks } from '@/hooks/platform-hooks';
@@ -31,12 +28,18 @@ import { userHooks } from '@/hooks/user-hooks';
 
 import { ProjectSettingsDialog } from '../project-settings';
 
+import { ProjectSwitcher } from './project-switcher';
+
 export const ProjectDashboardPageHeader = ({
   children,
   description,
+  pathnameOverride,
+  showSidebarToggle = true,
 }: {
   children?: React.ReactNode;
   description?: React.ReactNode;
+  pathnameOverride?: string;
+  showSidebarToggle?: boolean;
 }) => {
   const { project } = projectCollectionUtils.useCurrentProject();
   const { platform } = platformHooks.useCurrentPlatform();
@@ -46,6 +49,7 @@ export const ProjectDashboardPageHeader = ({
     'general' | 'members' | 'alerts' | 'pieces' | 'environment'
   >('general');
   const location = useLocation();
+  const pathname = pathnameOverride ?? location.pathname;
   const { projectMembers } = projectMembersHooks.useProjectMembers();
   const activeProjectMembers = projectMembers?.filter(
     (member) => member.user.status === UserStatus.ACTIVE,
@@ -77,7 +81,7 @@ export const ProjectDashboardPageHeader = ({
   const userCanInviteToPlatform = user?.platformRole === PlatformRole.ADMIN;
   const showInviteUserButton =
     userCanInviteToProject || userCanInviteToPlatform;
-  const isProjectPage = location.pathname.includes('/projects/');
+  const isProjectPage = pathname.includes('/projects/');
 
   const hasGeneralSettings =
     project.type === ProjectType.TEAM ||
@@ -100,29 +104,20 @@ export const ProjectDashboardPageHeader = ({
     return 'pieces';
   };
 
+  const currentPage = getCurrentPageBreadcrumb(pathname);
+  const PageIcon = currentPage?.icon;
+
   const titleContent = (
-    <div className="flex items-center gap-1">
-      <ApProjectDisplay
-        title={getProjectName(project)}
-        maxLengthToNotShowTooltip={30}
-        titleClassName="text-sm font-medium"
-        projectType={project.type}
-      />
-      {project.type === ProjectType.PERSONAL && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Lock className="w-4 h-4" />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>
-                {t(
-                  'This is your private project. Only you can see and access it.',
-                )}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+    <div className="flex min-w-0 items-center gap-1.5">
+      <ProjectSwitcher />
+      {currentPage && PageIcon && (
+        <>
+          <span className="text-sm font-semibold text-ring">/</span>
+          <div className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium">
+            <PageIcon className="flex size-4 shrink-0 items-center" size={16} />
+            {t(currentPage.label)}
+          </div>
+        </>
       )}
     </div>
   );
@@ -180,8 +175,8 @@ export const ProjectDashboardPageHeader = ({
         title={titleContent}
         description={description}
         rightContent={rightContent}
-        showSidebarToggle={true}
-        className="min-w-full"
+        showSidebarToggle={showSidebarToggle}
+        className="min-w-full h-12 border-b px-2 py-0"
       />
       <InviteUserDialog open={inviteOpen} setOpen={setInviteOpen} />
       <ProjectSettingsDialog
@@ -194,4 +189,38 @@ export const ProjectDashboardPageHeader = ({
       />
     </>
   );
+};
+
+function getCurrentPageBreadcrumb(
+  pathname: string,
+): ProjectPageBreadcrumb | null {
+  const segment = PROJECT_SECTION_REGEX.exec(pathname)?.[1];
+  if (isNil(segment)) {
+    return null;
+  }
+  return (
+    PROJECT_PAGE_BREADCRUMBS.find((page) => page.segments.includes(segment)) ??
+    null
+  );
+}
+
+const PROJECT_SECTION_REGEX = /^\/projects\/[^/]+\/([^/]+)/;
+
+const PROJECT_PAGE_BREADCRUMBS: ProjectPageBreadcrumb[] = [
+  {
+    segments: ['automations', 'flows', 'tables'],
+    label: 'Automations',
+    icon: WorkflowIcon,
+  },
+  { segments: ['runs'], label: 'Runs', icon: Play },
+  { segments: ['connections'], label: 'Connections', icon: UnplugIcon },
+  { segments: ['variables'], label: 'Variables', icon: FileJson2Icon },
+  { segments: ['releases'], label: 'Releases', icon: BoxIcon },
+  { segments: ['settings'], label: 'Settings', icon: SettingsIcon },
+];
+
+type ProjectPageBreadcrumb = {
+  segments: string[];
+  label: string;
+  icon: ComponentType<{ className?: string; size?: number }>;
 };

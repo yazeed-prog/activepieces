@@ -7,7 +7,11 @@ import { cn } from '@/lib/utils';
 
 import { useGlobalSearch } from './global-search-context';
 
-export function GlobalSearchCommand() {
+export function GlobalSearchCommand({
+  variant = 'default',
+}: {
+  variant?: 'default' | 'compact';
+} = {}) {
   const { setOpen } = useGlobalSearch();
   const { embedState } = useEmbedding();
   const isMac =
@@ -15,6 +19,24 @@ export function GlobalSearchCommand() {
 
   if (embedState.hideGlobalSearch) {
     return null;
+  }
+
+  if (variant === 'compact') {
+    return (
+      <Button
+        variant="outline"
+        onClick={() => setOpen(true)}
+        className={cn(
+          'h-8 shrink-0 gap-1.5 rounded-md px-2 font-normal',
+          'group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-2!',
+        )}
+      >
+        <Search className="size-4 shrink-0" />
+        <kbd className="pointer-events-none flex h-5 select-none items-center gap-1 rounded bg-muted py-0.5 px-1 font-mono text-[9px] font-medium group-data-[collapsible=icon]:hidden!">
+          {isMac ? '⌘' : 'Ctrl'}&nbsp;K
+        </kbd>
+      </Button>
+    );
   }
 
   return (

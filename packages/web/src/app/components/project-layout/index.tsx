@@ -1,6 +1,6 @@
 import { isNil } from '@activepieces/core-utils';
 import { ApEdition, ApFlagId } from '@activepieces/shared';
-import React, { ComponentType } from 'react';
+import React, { ComponentType, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router-dom';
 
@@ -9,18 +9,16 @@ import { CompassIcon } from '@/components/icons/compass';
 import { useEmbedding } from '@/components/providers/embed-provider';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar-shadcn';
 import { PurchaseExtraFlowsDialog } from '@/features/billing';
+import { chatSplitPage } from '@/features/chat/lib/chat-split-page';
 import { projectHooks } from '@/features/projects';
 import { flagsHooks } from '@/hooks/flags-hooks';
-import { cn } from '@/lib/utils';
 
 import { authenticationSession } from '../../../lib/authentication-session';
-import {
-  GlobalSearchProvider,
-  useGlobalSearch,
-} from '../global-search/global-search-context';
+import { GlobalSearchProvider } from '../global-search/global-search-context';
 import { ProjectDashboardSidebar } from '../sidebar/dashboard';
 
 import { ProjectDashboardLayoutHeader } from './project-dashboard-layout-header';
+import { ProjectDashboardPageHeader } from './project-dashboard-page-header';
 
 export type ProjectDashboardLayoutHeaderTab = {
   to: string;
@@ -53,6 +51,13 @@ export function ProjectDashboardLayout({
   const location = useLocation();
   const isPlatformPage = location.pathname.includes('/platform/');
   const isEmbedded = useEmbedding().embedState.isEmbedded;
+
+  // Remembered so the chat split-screen can reopen the page the user was on
+  // before navigating to /chat.
+  useEffect(() => {
+    chatSplitPage.recordVisit({ pathname: location.pathname });
+  }, [location.pathname]);
+
   if (isNil(currentProjectId) || currentProjectId === '') {
     return <Navigate to="/sign-in" replace />;
   }
@@ -112,29 +117,21 @@ function ProjectDashboardLayoutInner({
   currentProjectId: string;
   children: React.ReactNode;
 }) {
-  const { open: searchOpen } = useGlobalSearch();
-
   return (
-    <SidebarProvider defaultOpen={false} hoverMode={!searchOpen}>
-      {!isEmbedded && <ProjectDashboardSidebar />}
+    <SidebarProvider defaultOpen={true} hoverMode={true}>
+      {!isEmbedded && <ProjectDashboardSidebar collapsible="offcanvas" />}
       <SidebarInset className="flex flex-col h-full overflow-hidden bg-sidebar">
-        <div
-          className={cn(
-            'flex-1 flex flex-col overflow-hidden',
-            !isEmbedded && 'pr-2 pt-3 pb-3',
-          )}
-        >
+        <div className="flex-1 flex flex-col overflow-hidden">
           <div
             id="dashboard-content-container"
-            className={cn(
-              'relative flex flex-col h-full bg-background overflow-clip',
-              !isEmbedded &&
-                'rounded-xl shadow-[2px_0px_4px_-2px_rgba(0,0,0,0.05),0px_2px_4px_-2px_rgba(0,0,0,0.05)] border',
-            )}
+            className="relative flex flex-col h-full bg-background overflow-clip"
           >
-            {!hideHeader && (
-              <ProjectDashboardLayoutHeader key={currentProjectId} />
-            )}
+            {!hideHeader &&
+              (isEmbedded ? (
+                <ProjectDashboardLayoutHeader key={currentProjectId} />
+              ) : (
+                <ProjectDashboardPageHeader key={currentProjectId} />
+              ))}
             <div className="flex-1 overflow-auto">{children}</div>
           </div>
         </div>

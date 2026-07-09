@@ -1,17 +1,21 @@
 import { ApEdition, ApFlagId } from '@activepieces/shared';
 import { t } from 'i18next';
-import { ChevronsUpDown } from 'lucide-react';
+import { ChevronDown, PanelRightClose } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+import { ApSidebarToggle } from '@/components/custom/ap-sidebar-toggle';
 import { useEmbedding } from '@/components/providers/embed-provider';
 import { Button } from '@/components/ui/button';
 import {
   SidebarHeader,
-  SidebarMenu,
   SidebarMenuButton,
-  SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar-shadcn';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { PlatformSwitcher } from '@/features/projects';
 import { useAuthorization } from '@/hooks/authorization-hooks';
 import { flagsHooks } from '@/hooks/flags-hooks';
@@ -26,7 +30,7 @@ function SidebarLogoCollapsed({ linkTo }: { linkTo?: string }) {
       variant="ghost"
       size="icon"
       onClick={() => navigate(linkTo || '/')}
-      className="h-10! w-8! p-0! group-data-[collapsible=icon]:h-10! items-center justify-center"
+      className="h-8! w-8! p-0! items-center justify-center"
     >
       <img
         src={branding.logos.logoIconUrl}
@@ -42,7 +46,7 @@ export const AppSidebarHeader = () => {
   const { embedState } = useEmbedding();
   const { data: edition } = flagsHooks.useFlag<ApEdition>(ApFlagId.EDITION);
   const showSwitcher = edition === ApEdition.CLOUD && !embedState.isEmbedded;
-  const { state } = useSidebar();
+  const { state, isHoverExpanded, setOpen } = useSidebar();
   const { platform: currentPlatform } = platformHooks.useCurrentPlatform();
   const { checkAccess } = useAuthorization();
   const defaultRoute = determineDefaultRoute({
@@ -51,40 +55,41 @@ export const AppSidebarHeader = () => {
   });
   const branding = flagsHooks.useWebsiteBranding();
 
-  if (!showSwitcher) {
-    return (
-      <SidebarHeader className="pb-0">
-        <div className="w-full flex items-center gap-2">
-          <SidebarLogoCollapsed linkTo={defaultRoute} />
-          {state !== 'collapsed' && (
-            <h1 className="truncate text-sm font-medium">
-              {branding.websiteName}
-            </h1>
-          )}
-        </div>
-      </SidebarHeader>
-    );
-  }
+  const platformNameContent = showSwitcher ? (
+    <div className="flex-1 min-w-0">
+      <PlatformSwitcher>
+        <SidebarMenuButton className="group/platform-switcher h-8! w-full">
+          <span className="truncate font-medium flex-1 text-left text-sm">
+            {currentPlatform?.name ?? t('platform')}
+          </span>
+          <ChevronDown className="ml-auto hidden size-4 shrink-0 group-hover/platform-switcher:block" />
+        </SidebarMenuButton>
+      </PlatformSwitcher>
+    </div>
+  ) : (
+    <h1 className="flex-1 min-w-0 truncate text-sm font-medium">
+      {branding.websiteName}
+    </h1>
+  );
 
   return (
-    <SidebarHeader>
-      <SidebarMenu>
-        <SidebarMenuItem className="flex items-center">
-          <SidebarLogoCollapsed linkTo={defaultRoute} />
-          {state !== 'collapsed' && (
-            <div className="flex-1 min-w-0">
-              <PlatformSwitcher>
-                <SidebarMenuButton className="h-10! w-full">
-                  <span className="truncate font-medium flex-1 text-left text-sm">
-                    {currentPlatform?.name ?? t('platform')}
-                  </span>
-                  <ChevronsUpDown className="ml-auto size-3! shrink-0" />
-                </SidebarMenuButton>
-              </PlatformSwitcher>
-            </div>
-          )}
-        </SidebarMenuItem>
-      </SidebarMenu>
+    <SidebarHeader className="h-12 justify-center border-b px-2 py-0 group-data-[collapsible=icon]:px-1">
+      <div className="flex w-full items-center gap-1 group-data-[collapsible=icon]:flex-col">
+        <SidebarLogoCollapsed linkTo={defaultRoute} />
+        {state !== 'collapsed' && platformNameContent}
+        {isHoverExpanded ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={() => setOpen(true)}>
+                <PanelRightClose size={16} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t('Open Sidebar')}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <ApSidebarToggle />
+        )}
+      </div>
     </SidebarHeader>
   );
 };

@@ -15,8 +15,6 @@ import { projectCollectionUtils } from '@/features/projects';
 import { useAuthorization } from '@/hooks/authorization-hooks';
 import { authenticationSession } from '@/lib/authentication-session';
 
-import { ProjectDashboardPageHeader } from './project-dashboard-page-header';
-
 import { ProjectDashboardLayoutHeaderTab } from '.';
 
 type AnimatedIconHandle = {
@@ -123,7 +121,6 @@ export const ProjectDashboardLayoutHeader = () => {
 
   return (
     <div className="flex flex-col">
-      {!isEmbedded && <ProjectDashboardPageHeader />}
       {!embedState.hideSideNav && (
         <Tabs className="px-3 pt-2 border-b">
           <TabsList variant="outline">

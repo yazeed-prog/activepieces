@@ -772,6 +772,11 @@ export function useAgentChat({
 
   const setConversationId = useCallback(
     async (id: string) => {
+      if (conversationIdRef.current === id) {
+        // Already live — happens when the URL catches up with a conversation
+        // this session just created; reloading would kill the first stream.
+        return;
+      }
       stopStream();
       setIsPollingForAgentReply(false);
       updateSendStatus({ type: 'idle' });

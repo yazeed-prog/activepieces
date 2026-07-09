@@ -9,6 +9,7 @@ import { SimpleJsonViewer } from '@/components/custom/simple-json-viewer';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { TextShimmer } from '@/components/ui/text-shimmer';
 import { TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { DelayedTooltip } from '@/features/chat/components/delayed-tooltip';
 import {
   AnyToolPart,
   ThinkingStep,
@@ -19,8 +20,6 @@ import { toolIconUtils } from '@/features/chat/lib/tool-icons';
 import { PieceIcon } from '@/features/pieces/components/piece-icon';
 import { piecesHooks } from '@/features/pieces/hooks/pieces-hooks';
 import { cn } from '@/lib/utils';
-
-import { DelayedTooltip } from './delayed-tooltip';
 
 export function ThinkingBlock({
   thinkingSteps,
