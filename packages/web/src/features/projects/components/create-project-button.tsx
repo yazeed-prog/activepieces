@@ -109,6 +109,34 @@ function FullVariant({
   );
 }
 
+function GhostVariant({
+  disabled,
+  onCreate,
+}: {
+  disabled: boolean;
+  onCreate?: (project: ProjectWithLimits) => void;
+}) {
+  const button = (
+    <Button
+      variant="ghost"
+      size="sm"
+      disabled={disabled}
+      className="gap-2 text-primary hover:bg-primary/5 hover:text-primary"
+    >
+      <Plus className="size-4" />
+      {t('New Project')}
+    </Button>
+  );
+  if (disabled) {
+    return (
+      <UpgradeTooltip>
+        <div>{button}</div>
+      </UpgradeTooltip>
+    );
+  }
+  return <NewProjectDialog onCreate={onCreate}>{button}</NewProjectDialog>;
+}
+
 function SidebarMenuVariant({
   disabled,
   onCreate,
@@ -141,13 +169,16 @@ export function CreateProjectButton({
   projects,
   onCreate,
 }: {
-  variant: 'icon' | 'full' | 'sidebar-menu';
+  variant: 'icon' | 'full' | 'ghost' | 'sidebar-menu';
   projects: Pick<ProjectWithLimits, 'type'>[];
   onCreate?: (project: ProjectWithLimits) => void;
 }) {
   const disabled = useIsCreateProjectDisabled({ projects });
   if (variant === 'icon') {
     return <IconVariant disabled={disabled} onCreate={onCreate} />;
+  }
+  if (variant === 'ghost') {
+    return <GhostVariant disabled={disabled} onCreate={onCreate} />;
   }
   if (variant === 'sidebar-menu') {
     return <SidebarMenuVariant disabled={disabled} onCreate={onCreate} />;

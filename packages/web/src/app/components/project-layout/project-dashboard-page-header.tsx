@@ -6,18 +6,14 @@ import {
   UserStatus,
 } from '@activepieces/shared';
 import { t } from 'i18next';
-import { UsersRound, Play } from 'lucide-react';
-import { ComponentType, useState } from 'react';
+import { UsersRound } from 'lucide-react';
+import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 
 import { AnimatedIconButton } from '@/components/custom/animated-icon-button';
 import { PageHeader } from '@/components/custom/page-header';
-import { BoxIcon } from '@/components/icons/box';
-import { FileJson2Icon } from '@/components/icons/file-json2';
 import { SettingsIcon } from '@/components/icons/settings';
-import { UnplugIcon } from '@/components/icons/unplug';
 import { UserRoundPlusIcon } from '@/components/icons/user-round-plus';
-import { WorkflowIcon } from '@/components/icons/workflow';
 import { Button } from '@/components/ui/button';
 import { InviteUserDialog, projectMembersHooks } from '@/features/members';
 import { projectCollectionUtils } from '@/features/projects';
@@ -29,6 +25,7 @@ import { userHooks } from '@/hooks/user-hooks';
 import { ProjectSettingsDialog } from '../project-settings';
 
 import { ProjectSwitcher } from './project-switcher';
+import { SectionNavMenu } from './section-nav-menu';
 
 export const ProjectDashboardPageHeader = ({
   children,
@@ -105,18 +102,16 @@ export const ProjectDashboardPageHeader = ({
   };
 
   const currentPage = getCurrentPageBreadcrumb(pathname);
-  const PageIcon = currentPage?.icon;
 
   const titleContent = (
-    <div className="flex min-w-0 items-center gap-1.5">
+    <div className="flex min-w-0 items-center gap-0.5">
       <ProjectSwitcher />
-      {currentPage && PageIcon && (
+      {currentPage && (
         <>
-          <span className="text-sm font-semibold text-ring">/</span>
-          <div className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium">
-            <PageIcon className="flex size-4 shrink-0 items-center" size={16} />
-            {t(currentPage.label)}
-          </div>
+          <span className="text-sm font-normal text-muted-foreground/40">
+            /
+          </span>
+          <SectionNavMenu label={currentPage.label} />
         </>
       )}
     </div>
@@ -207,20 +202,15 @@ function getCurrentPageBreadcrumb(
 const PROJECT_SECTION_REGEX = /^\/projects\/[^/]+\/([^/]+)/;
 
 const PROJECT_PAGE_BREADCRUMBS: ProjectPageBreadcrumb[] = [
-  {
-    segments: ['automations', 'flows', 'tables'],
-    label: 'Automations',
-    icon: WorkflowIcon,
-  },
-  { segments: ['runs'], label: 'Runs', icon: Play },
-  { segments: ['connections'], label: 'Connections', icon: UnplugIcon },
-  { segments: ['variables'], label: 'Variables', icon: FileJson2Icon },
-  { segments: ['releases'], label: 'Releases', icon: BoxIcon },
-  { segments: ['settings'], label: 'Settings', icon: SettingsIcon },
+  { segments: ['automations', 'flows', 'tables'], label: 'Automations' },
+  { segments: ['runs'], label: 'Runs' },
+  { segments: ['connections'], label: 'Connections' },
+  { segments: ['variables'], label: 'Variables' },
+  { segments: ['releases'], label: 'Releases' },
+  { segments: ['settings'], label: 'Settings' },
 ];
 
 type ProjectPageBreadcrumb = {
   segments: string[];
   label: string;
-  icon: ComponentType<{ className?: string; size?: number }>;
 };

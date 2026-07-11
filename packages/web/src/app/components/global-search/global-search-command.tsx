@@ -32,8 +32,13 @@ export function GlobalSearchCommand({
         )}
       >
         <Search className="size-4 shrink-0" />
-        <kbd className="pointer-events-none flex h-5 select-none items-center gap-1 rounded bg-muted py-0.5 px-1 font-mono text-[9px] font-medium group-data-[collapsible=icon]:hidden!">
-          {isMac ? '⌘' : 'Ctrl'}&nbsp;K
+        <kbd className="pointer-events-none flex h-5 select-none items-center gap-px rounded bg-muted py-0.5 px-1 font-mono text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:hidden!">
+          {isMac ? (
+            <span className="text-sm leading-none">⌘</span>
+          ) : (
+            <span>Ctrl</span>
+          )}
+          <span>K</span>
         </kbd>
       </Button>
     );
@@ -53,8 +58,13 @@ export function GlobalSearchCommand({
       <span className="flex-1 text-left text-muted-foreground group-data-[collapsible=icon]:hidden">
         {t('Search...')}
       </span>
-      <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted py-0.5 px-1 font-mono text-[9px] font-medium sm:flex group-data-[collapsible=icon]:hidden!">
-        {isMac ? '⌘' : 'Ctrl'}&nbsp;K
+      <kbd className="pointer-events-none hidden h-5 select-none items-center gap-px rounded border bg-muted py-0.5 px-1 font-mono text-xs font-medium text-muted-foreground sm:flex group-data-[collapsible=icon]:hidden!">
+        {isMac ? (
+          <span className="text-sm leading-none">⌘</span>
+        ) : (
+          <span>Ctrl</span>
+        )}
+        <span>K</span>
       </kbd>
     </Button>
   );

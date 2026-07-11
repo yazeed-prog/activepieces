@@ -6,6 +6,7 @@ import DataGrid, { DataGridHandle } from 'react-data-grid';
 import 'react-data-grid/lib/styles.css';
 import { useNavigate } from 'react-router-dom';
 
+import { DetailPageBreadcrumb } from '@/app/components/project-layout/detail-page-breadcrumb';
 import { useTheme } from '@/components/providers/theme-provider';
 import {
   ApTableFooter,
@@ -116,6 +117,11 @@ const ApTableEditorPage = () => {
           onBack={handleBack}
           lockedBy={lockedBy}
           takeOver={takeOver}
+          renderTitle={(title) => (
+            <DetailPageBreadcrumb section="automations">
+              {title}
+            </DetailPageBreadcrumb>
+          )}
         />
       </div>
 

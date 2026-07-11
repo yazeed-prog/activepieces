@@ -259,6 +259,10 @@ export function SidebarConversations() {
                           side="bottom"
                           align="start"
                           onCloseAutoFocus={(e) => e.preventDefault()}
+                          // Rendered in a portal but still a React child of the
+                          // row button, so clicks bubble up the React tree and
+                          // would navigate to the conversation.
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <DropdownMenuItem
                             onSelect={(e) => {
