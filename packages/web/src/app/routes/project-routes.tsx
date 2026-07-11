@@ -9,11 +9,14 @@ import { ApTableStateProvider } from '@/features/tables';
 import { lazyWithRetry } from '@/lib/lazy-with-retry';
 import { routesThatRequireProjectId } from '@/lib/route-utils';
 
-import { BuilderLayout } from '../components/builder-layout';
+import { AllowOnlyLoggedInUserOnlyGuard } from '../components/allow-logged-in-user-only-guard';
 import { ProjectDashboardLayout } from '../components/project-layout';
 import { AfterImportFlowRedirect } from '../guards/after-import-flow-redirect';
 import { RoutePermissionGuard } from '../guards/permission-guard';
-import { ProjectRouterWrapper } from '../guards/project-route-wrapper';
+import {
+  ProjectDashboardRouterWrapper,
+  ProjectRouterWrapper,
+} from '../guards/project-route-wrapper';
 
 import { AutomationsPage } from './automations';
 const FlowBuilderPage = lazyWithRetry(
@@ -83,34 +86,30 @@ const automationsPagePermissions = [
 ];
 
 export const projectRoutes = [
-  ...ProjectRouterWrapper({
+  ...ProjectDashboardRouterWrapper({
     path: routesThatRequireProjectId.automations,
     element: (
-      <ProjectDashboardLayout>
-        <RoutePermissionGuard requiredPermissions={automationsPagePermissions}>
-          <PageTitle title="Flows">
-            <SuspenseWrapper>
-              <AutomationsPage />
-            </SuspenseWrapper>
-          </PageTitle>
-        </RoutePermissionGuard>
-      </ProjectDashboardLayout>
+      <RoutePermissionGuard requiredPermissions={automationsPagePermissions}>
+        <PageTitle title="Flows">
+          <SuspenseWrapper>
+            <AutomationsPage />
+          </SuspenseWrapper>
+        </PageTitle>
+      </RoutePermissionGuard>
     ),
   }),
   ...ProjectRouterWrapper({
     path: routesThatRequireProjectId.flows,
     element: <Navigate to={routesThatRequireProjectId.automations} replace />,
   }),
-  ...ProjectRouterWrapper({
+  ...ProjectDashboardRouterWrapper({
     path: routesThatRequireProjectId.singleFlow,
     element: (
       <RoutePermissionGuard requiredPermissions={Permission.READ_FLOW}>
         <PageTitle title="Builder">
-          <BuilderLayout>
-            <SuspenseWrapper>
-              <FlowBuilderPage />
-            </SuspenseWrapper>
-          </BuilderLayout>
+          <SuspenseWrapper>
+            <FlowBuilderPage />
+          </SuspenseWrapper>
         </PageTitle>
       </RoutePermissionGuard>
     ),
@@ -119,128 +118,112 @@ export const projectRoutes = [
     path: '/flow-import-redirect/:flowId',
     element: <AfterImportFlowRedirect></AfterImportFlowRedirect>,
   }),
-  ...ProjectRouterWrapper({
+  ...ProjectDashboardRouterWrapper({
     path: routesThatRequireProjectId.singleRun,
     element: (
       <RoutePermissionGuard requiredPermissions={Permission.READ_RUN}>
         <PageTitle title="Flow Run">
-          <BuilderLayout>
-            <SuspenseWrapper>
-              <FlowRunPage />
-            </SuspenseWrapper>
-          </BuilderLayout>
+          <SuspenseWrapper>
+            <FlowRunPage />
+          </SuspenseWrapper>
         </PageTitle>
       </RoutePermissionGuard>
     ),
   }),
-  ...ProjectRouterWrapper({
+  ...ProjectDashboardRouterWrapper({
     path: routesThatRequireProjectId.runs,
     element: (
-      <ProjectDashboardLayout>
-        <RoutePermissionGuard requiredPermissions={Permission.READ_RUN}>
-          <PageTitle title="Runs">
-            <SuspenseWrapper>
-              <RunsPage />
-            </SuspenseWrapper>
-          </PageTitle>
-        </RoutePermissionGuard>
-      </ProjectDashboardLayout>
-    ),
-  }),
-  ...ProjectRouterWrapper({
-    path: routesThatRequireProjectId.singleRelease,
-    element: (
-      <ProjectDashboardLayout>
-        <PageTitle title="Releases">
+      <RoutePermissionGuard requiredPermissions={Permission.READ_RUN}>
+        <PageTitle title="Runs">
           <SuspenseWrapper>
-            <ViewRelease />
+            <RunsPage />
           </SuspenseWrapper>
         </PageTitle>
-      </ProjectDashboardLayout>
+      </RoutePermissionGuard>
+    ),
+  }),
+  ...ProjectDashboardRouterWrapper({
+    path: routesThatRequireProjectId.singleRelease,
+    element: (
+      <PageTitle title="Releases">
+        <SuspenseWrapper>
+          <ViewRelease />
+        </SuspenseWrapper>
+      </PageTitle>
     ),
   }),
   ...ProjectRouterWrapper({
     path: routesThatRequireProjectId.tables,
     element: <Navigate to={routesThatRequireProjectId.automations} replace />,
   }),
-  ...ProjectRouterWrapper({
+  ...ProjectDashboardRouterWrapper({
     path: routesThatRequireProjectId.singleTable,
     element: (
       <HideTablesGuard>
         <RoutePermissionGuard requiredPermissions={Permission.READ_TABLE}>
           <PageTitle title="Table">
-            <BuilderLayout>
-              <ApTableStateProvider>
-                <SuspenseWrapper>
-                  <ApTableEditorPage />
-                </SuspenseWrapper>
-              </ApTableStateProvider>
-            </BuilderLayout>
+            <ApTableStateProvider>
+              <SuspenseWrapper>
+                <ApTableEditorPage />
+              </SuspenseWrapper>
+            </ApTableStateProvider>
           </PageTitle>
         </RoutePermissionGuard>
       </HideTablesGuard>
     ),
   }),
-  ...ProjectRouterWrapper({
+  ...ProjectDashboardRouterWrapper({
     path: routesThatRequireProjectId.connections,
     element: (
-      <ProjectDashboardLayout>
-        <RoutePermissionGuard
-          requiredPermissions={Permission.READ_APP_CONNECTION}
-        >
-          <PageTitle title="Connections">
-            <SuspenseWrapper>
-              <AppConnectionsPage />
-            </SuspenseWrapper>
-          </PageTitle>
-        </RoutePermissionGuard>
-      </ProjectDashboardLayout>
-    ),
-  }),
-  ...ProjectRouterWrapper({
-    path: routesThatRequireProjectId.variables,
-    element: (
-      <ProjectDashboardLayout>
-        <RoutePermissionGuard requiredPermissions={Permission.READ_VARIABLE}>
-          <PageTitle title="Variables">
-            <SuspenseWrapper>
-              <VariablesPage />
-            </SuspenseWrapper>
-          </PageTitle>
-        </RoutePermissionGuard>
-      </ProjectDashboardLayout>
-    ),
-  }),
-  ...ProjectRouterWrapper({
-    path: routesThatRequireProjectId.releases,
-    element: (
-      <ProjectDashboardLayout>
-        <PageTitle title="Releases">
+      <RoutePermissionGuard
+        requiredPermissions={Permission.READ_APP_CONNECTION}
+      >
+        <PageTitle title="Connections">
           <SuspenseWrapper>
-            <ProjectReleasesPage />
+            <AppConnectionsPage />
           </SuspenseWrapper>
         </PageTitle>
-      </ProjectDashboardLayout>
+      </RoutePermissionGuard>
     ),
   }),
-  ...ProjectRouterWrapper({
-    path: routesThatRequireProjectId.settings,
+  ...ProjectDashboardRouterWrapper({
+    path: routesThatRequireProjectId.variables,
     element: (
-      <ProjectDashboardLayout>
-        <SettingsRerouter></SettingsRerouter>
-      </ProjectDashboardLayout>
+      <RoutePermissionGuard requiredPermissions={Permission.READ_VARIABLE}>
+        <PageTitle title="Variables">
+          <SuspenseWrapper>
+            <VariablesPage />
+          </SuspenseWrapper>
+        </PageTitle>
+      </RoutePermissionGuard>
     ),
+  }),
+  ...ProjectDashboardRouterWrapper({
+    path: routesThatRequireProjectId.releases,
+    element: (
+      <PageTitle title="Releases">
+        <SuspenseWrapper>
+          <ProjectReleasesPage />
+        </SuspenseWrapper>
+      </PageTitle>
+    ),
+  }),
+  ...ProjectDashboardRouterWrapper({
+    path: routesThatRequireProjectId.settings,
+    element: <SettingsRerouter></SettingsRerouter>,
   }),
   {
     path: '/impact',
     element: (
-      <ProjectDashboardLayout>
-        <PageTitle title="Impact">
-          <SuspenseWrapper>
-            <AnalyticsPage />
-          </SuspenseWrapper>
-        </PageTitle>
-      </ProjectDashboardLayout>
+      <AllowOnlyLoggedInUserOnlyGuard>
+        <ProjectDashboardLayout>
+          <PageTitle title="Impact">
+            <SuspenseWrapper>
+              <AnalyticsPage />
+            </SuspenseWrapper>
+          </PageTitle>
+        </ProjectDashboardLayout>
+      </AllowOnlyLoggedInUserOnlyGuard>
     ),
   },
 ];

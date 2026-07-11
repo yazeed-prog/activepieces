@@ -33,8 +33,10 @@ import {
   chatConversationsCache,
   useChatConversations,
 } from '@/features/chat/lib/chat-conversations';
+import { chatRouteUtils } from '@/features/chat/lib/chat-routes';
 import { chatUtils } from '@/features/chat/lib/chat-utils';
 import { useConversationIndicators } from '@/features/chat/lib/use-conversation-indicators';
+import { useChatDockStore } from '@/features/chat/stores/chat-dock-state';
 import { platformHooks } from '@/hooks/platform-hooks';
 import { cn } from '@/lib/utils';
 
@@ -50,8 +52,16 @@ export function SidebarConversations() {
   const [renameValue, setRenameValue] = useState('');
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
+  const docked = useChatDockStore((state) => state.docked);
+  const dockedConversationId = useChatDockStore(
+    (state) => state.dockedConversationId,
+  );
+  const onChatRoute = chatRouteUtils.isChatRoute(location.pathname);
+  // The URL wins on chat routes; while docked on a regular page the dock
+  // store is the source of truth.
   const activeConversationId =
-    CHAT_CONVERSATION_PATH_REGEX.exec(location.pathname)?.[1] ?? null;
+    chatRouteUtils.conversationIdFromPathname(location.pathname) ??
+    (docked && !onChatRoute ? dockedConversationId : null);
 
   const { data: conversationsPage, isLoading } = useChatConversations();
 
@@ -87,6 +97,11 @@ export function SidebarConversations() {
     });
     chatConversationsCache.invalidate({ queryClient });
     if (activeConversationId === deleteTargetId) {
+      if (docked && !onChatRoute) {
+        useChatDockStore.getState().requestNewChat();
+        window.dispatchEvent(new Event(chatUtils.newChatEvent));
+        return;
+      }
       window.dispatchEvent(new Event(chatUtils.newChatEvent));
       navigate('/chat');
     }
@@ -98,6 +113,14 @@ export function SidebarConversations() {
 
   const handleConversationClick = (conversation: ChatConversation) => {
     markRead(conversation.id);
+    // While docked, swap the conversation inside the dock without leaving the
+    // current page.
+    if (docked && !onChatRoute) {
+      useChatDockStore
+        .getState()
+        .openConversation({ conversationId: conversation.id });
+      return;
+    }
     navigate(`/chat/${conversation.id}`);
   };
 
@@ -294,5 +317,3 @@ export function SidebarConversations() {
     </SidebarGroup>
   );
 }
-
-const CHAT_CONVERSATION_PATH_REGEX = /^\/chat\/([^/]+)/;

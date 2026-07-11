@@ -48,13 +48,16 @@ export function EmptyState({
   }
 
   return (
-    <div className="flex min-h-full flex-col pt-12 sm:pt-16 pb-6">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 w-full">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-8 sm:gap-10">
-          <div className="min-w-0 sm:flex-1 sm:max-w-md">
+    // Sized by container queries, not viewport breakpoints: in split view the
+    // panel narrows while the viewport doesn't, and the layout must follow
+    // the panel.
+    <div className="@container flex min-h-full flex-col pt-12 @xl:pt-16 pb-6">
+      <div className="max-w-3xl mx-auto px-6 w-full">
+        <div className="flex flex-col @2xl:flex-row @2xl:items-center gap-8 @2xl:gap-10">
+          <div className="min-w-0 @2xl:flex-1 @2xl:max-w-md">
             <Greeting firstName={firstName} incognito={false} />
           </div>
-          <div className="hidden sm:contents">
+          <div className="hidden @2xl:contents">
             <AppMarquee />
           </div>
         </div>
@@ -146,11 +149,14 @@ function Greeting({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <h1 className="text-4xl sm:text-5xl font-bold leading-[1.1] text-balance font-sentient">
+      <h1 className="text-4xl @xl:text-5xl font-bold leading-[1.1] text-balance font-sentient">
         {incognito
           ? t('Private Chat')
           : firstName
-          ? t(headline.withName, { name: firstName })
+          ? splitNameOntoOwnLine({
+              text: t(headline.withName, { name: firstName }),
+              name: firstName,
+            })
           : t(headline.plain)}
       </h1>
       {!incognito && (
@@ -161,6 +167,28 @@ function Greeting({
         </p>
       )}
     </motion.div>
+  );
+}
+
+// The name always sits on its own line, whatever the panel width. Splitting
+// the translated string (rather than the template) keeps working when a
+// locale reorders the sentence around the name.
+function splitNameOntoOwnLine({
+  text,
+  name,
+}: {
+  text: string;
+  name: string;
+}): ReactNode {
+  const nameIndex = text.indexOf(name);
+  if (nameIndex === -1) {
+    return text;
+  }
+  return (
+    <>
+      {text.slice(0, nameIndex).trimEnd()}
+      <span className="block">{text.slice(nameIndex)}</span>
+    </>
   );
 }
 
@@ -294,7 +322,7 @@ function ExampleCards({
     <div className="mt-16">
       {expanded ? (
         <motion.div
-          className="grid grid-cols-1 gap-4 sm:grid-cols-6"
+          className="grid grid-cols-1 gap-4 @md:grid-cols-2 @2xl:grid-cols-6"
           initial={reducedMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.18, ease: 'easeOut' }}
@@ -307,7 +335,7 @@ function ExampleCards({
               animateIn={false}
               onSuggestionClick={onSuggestionClick}
               largeText={i < 2}
-              className={i < 2 ? 'sm:col-span-3' : 'sm:col-span-2'}
+              className={i < 2 ? '@2xl:col-span-3' : '@2xl:col-span-2'}
             />
           ))}
         </motion.div>
@@ -502,9 +530,7 @@ function ExampleCard({
       type="button"
       className={cn(
         'group relative flex aspect-video cursor-pointer overflow-hidden rounded-xl text-left ring-1 ring-border/60',
-        large
-          ? 'w-[78vw] max-w-[360px] shrink-0 snap-start sm:w-[360px]'
-          : 'w-full',
+        large ? 'w-[78cqw] max-w-[360px] shrink-0 snap-start' : 'w-full',
         imgError && 'bg-neutral-900',
         className,
       )}
@@ -536,7 +562,9 @@ function ExampleCard({
         <h3
           className={cn(
             'font-bold leading-tight text-white [text-shadow:_0_1px_12px_rgb(0_0_0_/_60%)]',
-            emphasized ? 'text-2xl sm:text-3xl' : 'text-lg',
+            emphasized
+              ? 'text-base @md:text-2xl @2xl:text-3xl'
+              : 'text-base @md:text-lg',
           )}
         >
           {t(card.title)}

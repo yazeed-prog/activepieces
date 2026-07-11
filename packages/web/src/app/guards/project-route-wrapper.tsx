@@ -12,6 +12,7 @@ import {
 
 import { authenticationSession } from '../../lib/authentication-session';
 import { AllowOnlyLoggedInUserOnlyGuard } from '../components/allow-logged-in-user-only-guard';
+import { ProjectDashboardLayout } from '../components/project-layout';
 
 export const TokenCheckerWrapper: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -43,7 +44,6 @@ export const TokenCheckerWrapper: React.FC<{ children: React.ReactNode }> = ({
 
 type RedirectToCurrentProjectRouteProps = {
   path: string;
-  children: React.ReactNode;
 };
 const RedirectToCurrentProjectRoute: React.FC<
   RedirectToCurrentProjectRouteProps
@@ -100,9 +100,38 @@ export const ProjectRouterWrapper = ({
     path,
     element: (
       <AllowOnlyLoggedInUserOnlyGuard>
-        <RedirectToCurrentProjectRoute path={path}>
-          {element}
-        </RedirectToCurrentProjectRoute>
+        <RedirectToCurrentProjectRoute path={path} />
+      </AllowOnlyLoggedInUserOnlyGuard>
+    ),
+  },
+];
+
+// Dashboard pages put the layout ABOVE the token checker so every dashboard
+// route (and /chat) shares the exact same element-type chain down to the
+// layout — React then reuses the layout instance across navigations, which is
+// what keeps the docked chat mounted. The bare variant carries the layout too
+// so typed bare URLs (e.g. /runs) redirect without unmounting it.
+export const ProjectDashboardRouterWrapper = ({
+  element,
+  path,
+}: ProjectRouterWrapperProps) => [
+  {
+    path: `/projects/:projectId${path.startsWith('/') ? path : `/${path}`}`,
+    element: (
+      <AllowOnlyLoggedInUserOnlyGuard>
+        <ProjectDashboardLayout>
+          <TokenCheckerWrapper>{element}</TokenCheckerWrapper>
+        </ProjectDashboardLayout>
+      </AllowOnlyLoggedInUserOnlyGuard>
+    ),
+  },
+  {
+    path,
+    element: (
+      <AllowOnlyLoggedInUserOnlyGuard>
+        <ProjectDashboardLayout>
+          <RedirectToCurrentProjectRoute path={path} />
+        </ProjectDashboardLayout>
       </AllowOnlyLoggedInUserOnlyGuard>
     ),
   },

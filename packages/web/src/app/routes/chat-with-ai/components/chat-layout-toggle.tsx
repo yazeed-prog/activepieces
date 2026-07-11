@@ -21,8 +21,17 @@ export function ChatLayoutToggle({
   return (
     <div
       role="group"
-      className="flex items-center gap-0.5 rounded-md bg-muted p-0.5"
+      className="relative flex items-center gap-0.5 rounded-md bg-muted p-0.5"
     >
+      {/* The active-button pill: one element sliding between the two slots
+          (28px button + 2px gap) instead of a background jumping per button. */}
+      <div
+        aria-hidden="true"
+        className={cn(
+          'absolute left-0.5 top-0.5 h-7 w-7 rounded-[5px] bg-background shadow-sm transition-transform duration-200 ease-in-out',
+          mode === 'split' && 'translate-x-[30px]',
+        )}
+      />
       {items.map(({ mode: itemMode, label, Icon }) => (
         <ToggleItem
           key={itemMode}
@@ -58,9 +67,8 @@ function ToggleItem({ label, Icon, isActive, onSelect }: ToggleItemProps) {
             onSelect();
           }}
           className={cn(
-            'flex h-7 w-7 items-center justify-center rounded-[5px] text-muted-foreground transition-colors hover:text-foreground',
-            isActive &&
-              'bg-background text-foreground shadow-sm hover:text-foreground',
+            'relative flex h-7 w-7 items-center justify-center rounded-[5px] text-muted-foreground transition-colors hover:text-foreground',
+            isActive && 'text-foreground',
           )}
         >
           <Icon className="size-4" />

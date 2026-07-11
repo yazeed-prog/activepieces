@@ -12,7 +12,6 @@ import { projectRoutes } from '@/app/routes/project-routes';
 import { publicRoutes } from '@/app/routes/public-routes';
 import { RouteLoadingBar } from '@/components/custom/route-loading-bar';
 import { useEmbedding } from '@/components/providers/embed-provider';
-import { lazyWithRetry } from '@/lib/lazy-with-retry';
 
 import { AllowOnlyLoggedInUserOnlyGuard } from '../components/allow-logged-in-user-only-guard';
 import { RouteErrorBoundary } from '../components/global-error-boundary';
@@ -21,23 +20,14 @@ import { ProjectDashboardLayout } from '../components/project-layout';
 import { DefaultRoute } from './default-route';
 import { TokenCheckerWrapper } from './project-route-wrapper';
 
-const ChatWithAIPage = lazyWithRetry(
-  () =>
-    import('@/app/routes/chat-with-ai').then((m) => ({
-      default: m.ChatWithAIPage,
-    })),
-  'chat-with-ai',
-);
-
+// The chat UI itself is rendered by ProjectDashboardLayout (as a persistent
+// docked panel); the /chat routes only put the layout in fullscreen-chat mode,
+// so their child is empty.
 function chatElement() {
   return (
     <AllowOnlyLoggedInUserOnlyGuard>
       <ProjectDashboardLayout>
-        <PageTitle title="Chat">
-          <Suspense fallback={<RouteLoadingBar />}>
-            <ChatWithAIPage />
-          </Suspense>
-        </PageTitle>
+        <PageTitle title="Chat">{null}</PageTitle>
       </ProjectDashboardLayout>
     </AllowOnlyLoggedInUserOnlyGuard>
   );

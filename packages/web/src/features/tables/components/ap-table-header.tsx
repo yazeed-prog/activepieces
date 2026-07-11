@@ -110,7 +110,7 @@ export function ApTableHeader({
   };
 
   const titleContent = (
-    <Breadcrumb>
+    <Breadcrumb className="px-1.5">
       <BreadcrumbList>
         <BreadcrumbItem>
           <BreadcrumbLink onClick={onBack} className="cursor-pointer">
@@ -279,7 +279,8 @@ export function ApTableHeader({
       <PageHeader
         title={titleContent}
         rightContent={rightContent}
-        className="gap-1 justify-between px-4"
+        showSidebarToggle={!embedState.isEmbedded}
+        className="gap-1 justify-between h-12 px-2 py-0"
       />
       <div className="flex items-center gap-2">
         <Button

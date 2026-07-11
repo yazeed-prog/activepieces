@@ -3,7 +3,7 @@ import { TemplateTelemetryEventType } from '@activepieces/shared';
 import { t } from 'i18next';
 import { Play, Plus } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { BoxIcon } from '@/components/icons/box';
 import { ChartLineIcon } from '@/components/icons/chart-line';
@@ -22,7 +22,9 @@ import {
   SidebarMenu,
   useSidebar,
 } from '@/components/ui/sidebar-shadcn';
+import { chatRouteUtils } from '@/features/chat/lib/chat-routes';
 import { chatUtils } from '@/features/chat/lib/chat-utils';
+import { useChatDockStore } from '@/features/chat/stores/chat-dock-state';
 import { projectCollectionUtils } from '@/features/projects';
 import { templatesTelemetryApi } from '@/features/templates';
 import {
@@ -50,6 +52,7 @@ export function ProjectDashboardSidebar({
   const { embedState } = useEmbedding();
   const { state } = useSidebar();
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: currentUser } = userHooks.useCurrentUser();
   const { platform } = platformHooks.useCurrentPlatform();
   const { checkAccess } = useAuthorization();
@@ -64,8 +67,17 @@ export function ProjectDashboardSidebar({
 
   const handleNewChat = useCallback(() => {
     window.dispatchEvent(new Event(chatUtils.newChatEvent));
+    // From a regular page the chat docks in place (split view, URL stays the
+    // page's); only on chat routes / embedded does it navigate.
+    if (
+      !chatRouteUtils.isChatRoute(location.pathname) &&
+      !embedState.isEmbedded
+    ) {
+      useChatDockStore.getState().requestNewChat();
+      return;
+    }
     navigate('/chat');
-  }, [navigate]);
+  }, [location.pathname, embedState.isEmbedded, navigate]);
 
   const exploreLink: SidebarItemType = {
     type: 'link',
@@ -197,11 +209,11 @@ export function ProjectDashboardSidebar({
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 flex-1 justify-start gap-2 px-2 font-medium group-data-[collapsible=icon]:hidden"
+                className="h-8 min-w-0 flex-1 justify-start gap-2 px-2 font-medium group-data-[collapsible=icon]:hidden"
                 onClick={handleNewChat}
               >
-                <Plus className="size-4" />
-                <span className="text-xs">{t('New Chat')}</span>
+                <Plus className="size-4 shrink-0" />
+                <span className="truncate text-xs">{t('New Chat')}</span>
               </Button>
             )}
             <GlobalSearchCommand

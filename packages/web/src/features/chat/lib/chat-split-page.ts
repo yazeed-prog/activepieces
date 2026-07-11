@@ -1,5 +1,3 @@
-import { isNil } from '@activepieces/core-utils';
-
 const STORAGE_KEY = 'ap-chat-split-last-section';
 
 const SUPPORTED_SECTIONS = [
@@ -28,11 +26,6 @@ function getLastSection(): ChatSplitSection {
   return stored && isSupportedSection(stored) ? stored : 'automations';
 }
 
-function hasLastSection(): boolean {
-  const stored = sessionStorage.getItem(STORAGE_KEY);
-  return !isNil(stored) && isSupportedSection(stored);
-}
-
-export const chatSplitPage = { recordVisit, getLastSection, hasLastSection };
+export const chatSplitPage = { recordVisit, getLastSection };
 
 export type ChatSplitSection = (typeof SUPPORTED_SECTIONS)[number];

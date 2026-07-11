@@ -44,7 +44,6 @@ import { NEW_FLOW_QUERY_PARAM } from '@/lib/route-utils';
 import { cn } from '@/lib/utils';
 
 import FlowActionMenu from '../../components/flow-actions-menu';
-import { flowCanvasConsts } from '../flow-canvas/utils/consts';
 
 import { BuilderFlowStatusSection } from './flow-status';
 
@@ -99,7 +98,7 @@ export const BuilderHeader = () => {
   };
 
   const titleContent = (
-    <div className="flex items-center gap-2 px-4">
+    <div className="flex items-center gap-2 px-1.5">
       <Breadcrumb>
         <BreadcrumbList>
           {!embedState.disableNavigationInBuilder && (
@@ -209,17 +208,12 @@ export const BuilderHeader = () => {
   const leftContent = embedState.isEmbedded ? <HomeButton /> : null;
 
   return (
-    <div
-      style={{
-        height: `$${flowCanvasConsts.BUILDER_HEADER_HEIGHT}px`,
-      }}
-    >
-      <PageHeader
-        title={titleContent}
-        rightContent={rightContent}
-        leftContent={leftContent}
-        className="select-none border-b"
-      />
-    </div>
+    <PageHeader
+      title={titleContent}
+      rightContent={rightContent}
+      leftContent={leftContent}
+      showSidebarToggle={!embedState.isEmbedded}
+      className="select-none h-12 border-b px-2 py-0"
+    />
   );
 };

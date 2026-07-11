@@ -1,7 +1,9 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import { t } from 'i18next';
 import { Slot } from 'radix-ui';
 import * as React from 'react';
 
+import { useCursorTooltip } from '@/components/custom/cursor-tooltip';
 import { PanelLeftCloseIcon } from '@/components/icons/panel-left-close';
 import { PanelLeftOpenIcon } from '@/components/icons/panel-left-open';
 import { Button } from '@/components/ui/button';
@@ -26,11 +28,17 @@ import { cn } from '@/lib/utils';
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH_STORAGE_KEY = 'sidebar_width';
+const SIDEBAR_WIDTH = '16rem';
 const SIDEBAR_DEFAULT_WIDTH_PX = 256;
-// Dragging below 60% of the default width closes the sidebar entirely.
-const SIDEBAR_MIN_WIDTH_PX = Math.round(SIDEBAR_DEFAULT_WIDTH_PX * 0.6);
-// Default --sidebar-width (256px) + edge margin — the hover-keep column for the
+// The resize handle never changes the sidebar's width — dragging inward only
+// pushes it off-screen to close it. Within the safety zone the push is a
+// preview: content stays fully visible and releasing snaps the sidebar back;
+// past it the content starts fading and releasing commits the close.
+const SIDEBAR_CLOSE_DRAG_DEAD_ZONE_PX = 40;
+// Releasing without having moved past this counts as a click, which closes.
+const SIDEBAR_CLICK_MOVEMENT_TOLERANCE_PX = 5;
+const SIDEBAR_FADE_END_OFFSET_PX = SIDEBAR_DEFAULT_WIDTH_PX * 0.8;
+// --sidebar-width (16rem = 256px) + edge margin — the hover-keep column for the
 // offcanvas hover panel; the pointer anywhere in this column keeps it open.
 const SIDEBAR_HOVER_COLUMN_WIDTH_PX = 272;
 const SIDEBAR_EDGE_GLOW_WIDTH_PX = 40;
@@ -88,24 +96,28 @@ function SidebarProvider({
     }
     return defaultOpen;
   });
-  const [sidebarWidth, setSidebarWidthState] = React.useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = Number(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
-      if (
-        stored >= SIDEBAR_MIN_WIDTH_PX &&
-        stored <= SIDEBAR_DEFAULT_WIDTH_PX
-      ) {
-        return stored;
-      }
-    }
-    return SIDEBAR_DEFAULT_WIDTH_PX;
-  });
+  // How far the close drag has pushed the sidebar off-screen (0..default
+  // width) — the sidebar's width itself never changes.
+  const [closeDragOffset, setCloseDragOffset] = React.useState(0);
   const [isResizing, setIsResizing] = React.useState(false);
-
-  const setSidebarWidth = React.useCallback((width: number) => {
-    setSidebarWidthState(clampSidebarWidth(width));
-  }, []);
   const persistedOpen = openProp ?? _open;
+
+  // A drag-close hides the sidebar instantly: transitions stay suppressed
+  // until the hidden state has actually painted (double rAF) — re-enabling
+  // them in the same frame would let the browser animate the jump instead.
+  React.useEffect(() => {
+    if (!isResizing || persistedOpen) {
+      return;
+    }
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => setIsResizing(false));
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  }, [isResizing, persistedOpen]);
 
   const isHoverExpanded = hoverMode && !persistedOpen && isHovered;
   const open = persistedOpen || isHoverExpanded;
@@ -215,7 +227,8 @@ function SidebarProvider({
       isHoverExpanded,
       shouldElevateZIndex,
       setHovered,
-      setSidebarWidth,
+      closeDragOffset,
+      setCloseDragOffset,
       isResizing,
       setIsResizing,
     }),
@@ -231,7 +244,7 @@ function SidebarProvider({
       hoverMode,
       isHoverExpanded,
       setHovered,
-      setSidebarWidth,
+      closeDragOffset,
       isResizing,
     ],
   );
@@ -243,7 +256,7 @@ function SidebarProvider({
           data-slot="sidebar-wrapper"
           style={
             {
-              '--sidebar-width': `${sidebarWidth}px`,
+              '--sidebar-width': SIDEBAR_WIDTH,
               '--sidebar-width-icon': SIDEBAR_WIDTH_ICON,
               ...style,
             } as React.CSSProperties
@@ -285,6 +298,7 @@ function Sidebar({
     isHoverExpanded,
     shouldElevateZIndex,
     setHovered,
+    closeDragOffset,
     isResizing,
   } = useSidebar();
 
@@ -459,6 +473,13 @@ function Sidebar({
       {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"
+        // While the close drag pushes the sidebar out, the layout gap follows
+        // the visible width so the page content slides in behind it.
+        style={
+          isResizing
+            ? { width: SIDEBAR_DEFAULT_WIDTH_PX - closeDragOffset }
+            : undefined
+        }
         className={cn(
           'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear',
           isResizing && 'transition-none',
@@ -514,11 +535,38 @@ function Sidebar({
           shouldElevateZIndex && 'z-55',
           className,
         )}
+        // The close drag pushes the whole panel off-screen instead of
+        // shrinking it, so the content never squishes.
+        style={
+          isResizing
+            ? side === 'left'
+              ? { left: -closeDragOffset }
+              : { right: -closeDragOffset }
+            : undefined
+        }
         {...props}
       >
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
+          // The content stays fully visible through the safety zone, then
+          // fades out, reaching fully transparent at 80% of the way.
+          style={
+            isResizing
+              ? {
+                  opacity: Math.max(
+                    0,
+                    1 -
+                      Math.max(
+                        0,
+                        closeDragOffset - SIDEBAR_CLOSE_DRAG_DEAD_ZONE_PX,
+                      ) /
+                        (SIDEBAR_FADE_END_OFFSET_PX -
+                          SIDEBAR_CLOSE_DRAG_DEAD_ZONE_PX),
+                  ),
+                }
+              : undefined
+          }
           className={cn(
             'flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow',
             isOffcanvasHoverPanel && 'rounded-lg',
@@ -546,63 +594,93 @@ function Sidebar({
 }
 
 function SidebarResizeHandle({ side }: { side: 'left' | 'right' }) {
-  const { setOpen, setSidebarWidth, setIsResizing } = useSidebar();
-
-  const widthFromPointer = (clientX: number) =>
-    side === 'left' ? clientX : window.innerWidth - clientX;
+  const { setOpen, setCloseDragOffset, isResizing, setIsResizing } =
+    useSidebar();
+  const latestOffsetRef = React.useRef(0);
+  const startPointRef = React.useRef<{ x: number; y: number } | null>(null);
+  const maxMovementRef = React.useRef(0);
+  // The sidebar cannot be resized — clicking or dragging its line only
+  // closes it, so the tooltip offers a single combined hint.
+  const cursorTooltip = useCursorTooltip({
+    lines: [{ action: t('Click or drag'), description: t('to close') }],
+    disabled: isResizing,
+  });
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
+    latestOffsetRef.current = 0;
+    startPointRef.current = { x: event.clientX, y: event.clientY };
+    maxMovementRef.current = 0;
+    setCloseDragOffset(0);
     setIsResizing(true);
   };
 
+  // Dragging inward pushes the whole sidebar off-screen (content fading,
+  // never squished); whether it actually closes is decided on release.
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    const width = widthFromPointer(event.clientX);
-    if (width < SIDEBAR_MIN_WIDTH_PX) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-      setIsResizing(false);
+    if (startPointRef.current) {
+      maxMovementRef.current = Math.max(
+        maxMovementRef.current,
+        Math.hypot(
+          event.clientX - startPointRef.current.x,
+          event.clientY - startPointRef.current.y,
+        ),
+      );
+    }
+    const rawOffset =
+      side === 'left'
+        ? SIDEBAR_DEFAULT_WIDTH_PX - event.clientX
+        : event.clientX - (window.innerWidth - SIDEBAR_DEFAULT_WIDTH_PX);
+    const offset = Math.min(SIDEBAR_DEFAULT_WIDTH_PX, Math.max(0, rawOffset));
+    latestOffsetRef.current = offset;
+    setCloseDragOffset(offset);
+  };
+
+  // Fires on every way a drag can end — pointerup, pointercancel, explicit
+  // release — unlike pointerup/pointercancel handlers, which the browser can
+  // skip after it has already dropped the capture, leaving the resizing state
+  // (and the handle's active color) stuck on.
+  const handleLostPointerCapture = () => {
+    const wasClick =
+      startPointRef.current !== null &&
+      maxMovementRef.current < SIDEBAR_CLICK_MOVEMENT_TOLERANCE_PX;
+    startPointRef.current = null;
+    const shouldClose =
+      wasClick || latestOffsetRef.current > SIDEBAR_CLOSE_DRAG_DEAD_ZONE_PX;
+    if (shouldClose) {
+      // The close is instant, not animated: snap fully hidden while the
+      // resizing flag still disables transitions; the unmount cleanup then
+      // re-enables them after the hidden state has painted.
+      setCloseDragOffset(SIDEBAR_DEFAULT_WIDTH_PX);
       setOpen(false);
       return;
     }
-    setSidebarWidth(width);
-  };
-
-  // The persisted width is only written on a completed drag, so a drag that
-  // ends in a close keeps the last comfortable width for the next open.
-  const handlePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    event.currentTarget.releasePointerCapture(event.pointerId);
     setIsResizing(false);
-    localStorage.setItem(
-      SIDEBAR_WIDTH_STORAGE_KEY,
-      String(clampSidebarWidth(widthFromPointer(event.clientX))),
-    );
+    setCloseDragOffset(0);
   };
 
   return (
-    <div
-      data-slot="sidebar-resize-handle"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize Sidebar"
-      className={cn(
-        'absolute inset-y-0 z-30 w-1.5 cursor-col-resize touch-none hover:bg-sidebar-border active:bg-sidebar-border',
-        side === 'left' ? 'right-0' : 'left-0',
-      )}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerEnd}
-      onPointerCancel={handlePointerEnd}
-    />
-  );
-}
-
-function clampSidebarWidth(width: number): number {
-  return Math.min(
-    SIDEBAR_DEFAULT_WIDTH_PX,
-    Math.max(SIDEBAR_MIN_WIDTH_PX, width),
+    <>
+      <div
+        data-slot="sidebar-resize-handle"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize Sidebar"
+        className={cn(
+          'absolute inset-y-0 z-30 w-px cursor-col-resize touch-none transition-colors duration-200 ease-in-out hover:bg-muted-foreground/40 after:absolute after:inset-y-0 after:left-1/2 after:w-1.5 after:-translate-x-1/2',
+          isResizing && 'bg-muted-foreground/40 duration-0',
+          side === 'left' ? 'right-0' : 'left-0',
+        )}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerEnter={cursorTooltip.handlers.onPointerEnter}
+        onPointerLeave={cursorTooltip.handlers.onPointerLeave}
+        onLostPointerCapture={handleLostPointerCapture}
+      />
+      {cursorTooltip.tooltip}
+    </>
   );
 }
 
@@ -1093,7 +1171,8 @@ type SidebarContextProps = {
   isHoverExpanded: boolean;
   shouldElevateZIndex: boolean;
   setHovered: (hovered: boolean) => void;
-  setSidebarWidth: (width: number) => void;
+  closeDragOffset: number;
+  setCloseDragOffset: (offset: number) => void;
   isResizing: boolean;
   setIsResizing: (resizing: boolean) => void;
 };

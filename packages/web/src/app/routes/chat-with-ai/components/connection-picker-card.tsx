@@ -13,6 +13,7 @@ import { CreateOrEditConnectionDialog } from '@/app/connections/create-edit-conn
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { chatApi } from '@/features/chat/lib/chat-api';
+import { useChatStoreContext } from '@/features/chat/lib/chat-store-context';
 import { appConnectionsApi } from '@/features/connections/api/app-connections';
 import { piecesHooks } from '@/features/pieces';
 import { PieceIconWithPieceName } from '@/features/pieces/components/piece-icon-from-name';
@@ -25,7 +26,6 @@ import {
   normalizePieceName,
   pickDefaultConnectionExternalId,
 } from '../lib/message-parsers';
-import { useConversationId } from '../lib/use-conversation-id';
 
 import { InteractiveCardShell } from './interactive-card-shell';
 
@@ -162,7 +162,9 @@ export function ConnectionPickerCard({
   selectedConnectionLabel,
 }: ConnectionPickerCardProps) {
   const queryClient = useQueryClient();
-  const conversationId = useConversationId();
+  // From the chat store (not the URL): while the chat is docked on a regular
+  // page the URL carries no conversation id.
+  const conversationId = useChatStoreContext((state) => state.conversationId);
   const pieceName = normalizePieceName(picker.piece);
   const shouldFetch =
     !picker.connections?.length && !!conversationId && isInteractive;
