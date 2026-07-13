@@ -56,7 +56,7 @@ export function ProjectSwitcher() {
     handleHoverEnter,
     handleHoverLeave,
     handleOpenChange,
-    pinIfHoverOpened,
+    keepOpenOnClick,
     close,
   } = useHoverOpenPopover();
 
@@ -100,7 +100,7 @@ export function ProjectSwitcher() {
           className="pointer-events-auto h-auto min-w-0 gap-2 rounded-md px-1.5 py-1 font-medium"
           onMouseEnter={handleHoverEnter}
           onMouseLeave={handleHoverLeave}
-          onClick={pinIfHoverOpened}
+          onClick={keepOpenOnClick}
         >
           <ProjectLetterAvatar project={currentProject} className="size-4" />
           <span className="truncate max-w-[200px] text-sm leading-5">

@@ -24,7 +24,9 @@ function quickRepliesMessage(
         toolCallId: 'call-1',
         state,
         input,
-        ...(state === 'output-available' ? { output: { displayed: true } } : {}),
+        ...(state === 'output-available'
+          ? { output: { displayed: true } }
+          : {}),
       },
     ],
   } as ChatUIMessage;
@@ -73,7 +75,10 @@ describe('quick replies extraction', () => {
   describe('extractQuickRepliesFromHistory', () => {
     it('reads replies and the recurring flag from the last message', () => {
       const result = chatUtils.extractQuickRepliesFromHistory([
-        quickRepliesMessage({ replies: ['A', 'B'], offerRecurringAutomation: true }),
+        quickRepliesMessage({
+          replies: ['A', 'B'],
+          offerRecurringAutomation: true,
+        }),
       ]);
       expect(result).toEqual({
         replies: ['A', 'B'],

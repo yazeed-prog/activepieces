@@ -33,7 +33,7 @@ export function SectionNavMenu({ label }: SectionNavMenuProps) {
     handleHoverEnter,
     handleHoverLeave,
     handleOpenChange,
-    pinIfHoverOpened,
+    keepOpenOnClick,
     close,
   } = useHoverOpenPopover();
 
@@ -53,7 +53,7 @@ export function SectionNavMenu({ label }: SectionNavMenuProps) {
           className="pointer-events-auto h-auto shrink-0 rounded-md px-1.5 py-1 text-sm font-medium"
           onMouseEnter={handleHoverEnter}
           onMouseLeave={handleHoverLeave}
-          onClick={pinIfHoverOpened}
+          onClick={keepOpenOnClick}
         >
           {t(label)}
         </Button>

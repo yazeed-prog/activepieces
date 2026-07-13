@@ -6,7 +6,6 @@ import { RightSideBarType } from '@/app/builder/types';
 import { flowRunUtils } from '@/features/flow-runs';
 
 import { BuilderState } from '../builder-hooks';
-import { flowCanvasUtils } from '../flow-canvas/utils/flow-canvas-utils';
 import { CanvasOrientation } from '../flow-canvas/utils/types';
 
 export type StepDataPanelView = 'drawer' | 'split';
@@ -48,6 +47,8 @@ export type CanvasState = {
   setStepDataPanelView: (view: StepDataPanelView) => void;
   isStepDataPanelOpen: boolean;
   setStepDataPanelOpen: (open: boolean) => void;
+  rightSidebarSizePercentage: number | null;
+  setRightSidebarSizePercentage: (sizePercentage: number) => void;
 };
 
 type CanvasStateInitialState = Pick<
@@ -59,19 +60,14 @@ export const createCanvasState = (
   initialState: CanvasStateInitialState,
   set: StoreApi<BuilderState>['setState'],
 ): CanvasState => {
+  // Opening a run jumps straight to the step that needs attention; opening a
+  // flow for editing selects nothing — the user opens step settings themselves.
   const failedStepNameInRun = initialState.run?.steps
     ? flowRunUtils.findLastStepWithStatus(
         initialState.run.status,
         initialState.run.steps,
       )
     : null;
-  const initiallySelectedStep = flowCanvasUtils.determineInitiallySelectedStep(
-    failedStepNameInRun,
-    initialState.flowVersion,
-  );
-  const isEmptyTriggerInitiallySelected =
-    initiallySelectedStep === 'trigger' &&
-    initialState.flowVersion.trigger.type === FlowTriggerType.EMPTY;
   return {
     canvasOrientation: getCanvasOrientationFromLocalStorage(),
     setCanvasOrientation: (orientation: CanvasOrientation) => {
@@ -87,12 +83,11 @@ export const createCanvasState = (
     setShowMinimap: (showMinimap: boolean) => set({ showMinimap }),
     readonly: initialState.readonly,
     hideTestWidget: initialState.hideTestWidget ?? false,
-    selectedStep: initiallySelectedStep,
+    selectedStep: failedStepNameInRun,
     activeDraggingStep: null,
-    rightSidebar:
-      initiallySelectedStep && !isEmptyTriggerInitiallySelected
-        ? RightSideBarType.PIECE_SETTINGS
-        : RightSideBarType.NONE,
+    rightSidebar: failedStepNameInRun
+      ? RightSideBarType.PIECE_SETTINGS
+      : RightSideBarType.NONE,
     removeStepSelection: () =>
       set({
         selectedStep: null,
@@ -223,6 +218,11 @@ export const createCanvasState = (
         isStepDataPanelOpen: open,
       }));
     },
+    // Deliberately in-memory (no localStorage): the remembered sidebar width
+    // resets every time the builder is entered fresh.
+    rightSidebarSizePercentage: null,
+    setRightSidebarSizePercentage: (sizePercentage: number) =>
+      set({ rightSidebarSizePercentage: sizePercentage }),
   };
 };
 

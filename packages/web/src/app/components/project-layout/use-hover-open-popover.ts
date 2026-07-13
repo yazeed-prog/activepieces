@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// Shared open-state for header menus that open on hover as well as click:
-// a hover-opened menu closes when the pointer leaves (with small delays that
-// forgive a pointer just passing through), while a click-opened (or
-// click-pinned) one stays until dismissed. Pair with a modal Popover so the
-// rest of the page can't be hovered or clicked while the menu is open.
+// Shared open-state for header menus that open on hover as well as click.
+// The menu never pins: however it was opened, it closes when the pointer
+// leaves (with small delays that forgive a pointer just passing through).
+// Clicking the trigger of an open menu is a no-op rather than a toggle-close,
+// so dismissal stays hover-driven. Pair with a modal Popover so the rest of
+// the page can't be hovered or clicked while the menu is open.
 export function useHoverOpenPopover() {
   const [open, setOpen] = useState(false);
   const hoverOpenTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -13,7 +14,6 @@ export function useHoverOpenPopover() {
   const hoverCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const openedByHoverRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -49,7 +49,6 @@ export function useHoverOpenPopover() {
     if (open || hoverOpenTimeoutRef.current) return;
     hoverOpenTimeoutRef.current = setTimeout(() => {
       hoverOpenTimeoutRef.current = null;
-      openedByHoverRef.current = true;
       setOpen(true);
     }, HOVER_OPEN_DELAY_MS);
   }, [open]);
@@ -59,7 +58,7 @@ export function useHoverOpenPopover() {
       clearTimeout(hoverOpenTimeoutRef.current);
       hoverOpenTimeoutRef.current = null;
     }
-    if (!open || !openedByHoverRef.current || hoverCloseTimeoutRef.current) {
+    if (!open || hoverCloseTimeoutRef.current) {
       return;
     }
     hoverCloseTimeoutRef.current = setTimeout(() => {
@@ -69,18 +68,14 @@ export function useHoverOpenPopover() {
   }, [open]);
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
-    if (nextOpen) {
-      openedByHoverRef.current = false;
-    }
     setOpen(nextOpen);
   }, []);
 
-  // Clicking a hover-opened trigger pins the menu open instead of letting the
-  // trigger toggle it closed.
-  const pinIfHoverOpened = useCallback(
+  // Radix toggles an open popover closed when its trigger is clicked; swallow
+  // that so a click can only ever open the menu, never pin or close it.
+  const keepOpenOnClick = useCallback(
     (event: React.MouseEvent) => {
-      if (open && openedByHoverRef.current) {
-        openedByHoverRef.current = false;
+      if (open) {
         event.preventDefault();
       }
     },
@@ -94,7 +89,7 @@ export function useHoverOpenPopover() {
     handleHoverEnter,
     handleHoverLeave,
     handleOpenChange,
-    pinIfHoverOpened,
+    keepOpenOnClick,
     close,
   };
 }

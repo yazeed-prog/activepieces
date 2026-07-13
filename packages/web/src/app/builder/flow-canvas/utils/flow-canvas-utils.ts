@@ -17,7 +17,6 @@ import {
 import { t } from 'i18next';
 
 import { flowRunUtils } from '@/features/flow-runs';
-import { NEW_FLOW_QUERY_PARAM } from '@/lib/route-utils';
 
 import { flowCanvasLayoutConsts } from './layout-consts';
 import {
@@ -694,22 +693,6 @@ function buildNotesGraph(notes: Note[]): ApGraph {
   };
 }
 
-function determineInitiallySelectedStep(
-  failedStepNameInRun: string | null,
-  flowVersion: FlowVersion,
-): string | null {
-  const firstInvalidStep = flowStructureUtil
-    .getAllSteps(flowVersion.trigger)
-    .find((s) => !s.valid);
-  const isNewFlow = window.location.search.includes(NEW_FLOW_QUERY_PARAM);
-  if (failedStepNameInRun) {
-    return failedStepNameInRun;
-  }
-  if (isNewFlow) {
-    return null;
-  }
-  return firstInvalidStep?.name ?? 'trigger';
-}
 const doesSelectionRectangleExist = () => {
   return (
     document.querySelector(
@@ -751,6 +734,5 @@ export const flowCanvasUtils = {
   createAddOperationFromAddButtonData,
   isSkipped,
   getStepStatus,
-  determineInitiallySelectedStep,
   doesSelectionRectangleExist,
 };

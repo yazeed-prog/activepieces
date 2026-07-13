@@ -24,6 +24,7 @@ import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar-shadcn';
 import { PurchaseExtraFlowsDialog } from '@/features/billing';
 import { chatRouteUtils } from '@/features/chat/lib/chat-routes';
 import { chatSplitPage } from '@/features/chat/lib/chat-split-page';
+import { useChatDockUrlSync } from '@/features/chat/lib/use-chat-dock-url-sync';
 import { useChatDockStore } from '@/features/chat/stores/chat-dock-state';
 import { projectHooks } from '@/features/projects';
 import { flagsHooks } from '@/hooks/flags-hooks';
@@ -125,6 +126,9 @@ function ProjectDashboardLayoutInner({
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { platform } = platformHooks.useCurrentPlatform();
+  // Must run before the `docked` read below: it hydrates the store from the
+  // `?chat=` param synchronously so the first render restores the split view.
+  useChatDockUrlSync();
   const docked = useChatDockStore((state) => state.docked);
   const onChatRoute = chatRouteUtils.isChatRoute(location.pathname);
   const dockAllowed = docked && platform.plan.chatEnabled && !isEmbedded;

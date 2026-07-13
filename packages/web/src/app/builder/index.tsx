@@ -1,3 +1,4 @@
+import { isNil } from '@activepieces/core-utils';
 import {
   FlowAction,
   FlowActionType,
@@ -39,9 +40,9 @@ const animateResizeClassName = `transition-all `;
 
 const SPLIT_MODE_INITIAL_OPEN_SIZE_PX = 1000;
 const SPLIT_MODE_SIDEBAR_SIZE_PX = 850;
-const DEFAULT_SIDEBAR_SIZE = '25%';
 const DEFAULT_MIN_SIZE = '400px';
 const SPLIT_MODE_COLLAPSE_THRESHOLD_PX = 700;
+const DRAG_MOVEMENT_TOLERANCE_PX = 5;
 
 const BuilderPage = () => {
   const { platform } = platformHooks.useCurrentPlatform();
@@ -55,6 +56,8 @@ const BuilderPage = () => {
     isStepDataPanelOpen,
     setStepDataPanelView,
     setStepDataPanelOpen,
+    rightSidebarSizePercentage,
+    setRightSidebarSizePercentage,
   ] = useBuilderStateContext((state) => [
     state.flowVersion,
     state.rightSidebar,
@@ -68,6 +71,8 @@ const BuilderPage = () => {
     state.isStepDataPanelOpen,
     state.setStepDataPanelView,
     state.setStepDataPanelOpen,
+    state.rightSidebarSizePercentage,
+    state.setRightSidebarSizePercentage,
   ]);
   useEffect(() => {
     return () => {
@@ -78,11 +83,9 @@ const BuilderPage = () => {
   const middlePanelRef = useRef<HTMLDivElement>(null);
   const middlePanelSize = useElementSize(middlePanelRef);
   const [isDraggingHandle, setIsDraggingHandle] = useState(false);
-  useEffect(() => {
-    const handlePointerUp = () => setIsDraggingHandle(false);
-    window.addEventListener('pointerup', handlePointerUp);
-    return () => window.removeEventListener('pointerup', handlePointerUp);
-  }, []);
+  const isDraggingHandleRef = useRef(false);
+  const dragStartPointRef = useRef<{ x: number; y: number } | null>(null);
+  const dragStartedInSplitLayoutRef = useRef(false);
   const isSplitForPiece =
     rightSidebar === RightSideBarType.PIECE_SETTINGS &&
     stepDataPanelView === 'split' &&
@@ -94,6 +97,37 @@ const BuilderPage = () => {
   const rightHandleRef = useRef<PanelImperativeHandle>(null);
   const rightSidePanelRef = useRef<HTMLDivElement>(null);
   const previousRightSidebar = usePrevious(rightSidebar);
+
+  // The remembered width is captured on drag end (never during onResize, which
+  // fires every pointer move). Split-layout drags are skipped: those widths are
+  // functional (settings + test output side by side) and not meaningful for
+  // the normal layout.
+  useEffect(() => {
+    const handleDragEnd = (event: PointerEvent) => {
+      setIsDraggingHandle(false);
+      if (!isDraggingHandleRef.current) return;
+      isDraggingHandleRef.current = false;
+      const start = dragStartPointRef.current;
+      dragStartPointRef.current = null;
+      if (event.type === 'pointercancel') return;
+      const movedEnough =
+        !isNil(start) &&
+        Math.hypot(event.clientX - start.x, event.clientY - start.y) >=
+          DRAG_MOVEMENT_TOLERANCE_PX;
+      if (!movedEnough) return;
+      if (dragStartedInSplitLayoutRef.current) return;
+      if (rightSidebar === RightSideBarType.NONE) return;
+      const percentage = rightHandleRef.current?.getSize().asPercentage;
+      if (isNil(percentage) || percentage <= 0) return;
+      setRightSidebarSizePercentage(percentage);
+    };
+    window.addEventListener('pointerup', handleDragEnd);
+    window.addEventListener('pointercancel', handleDragEnd);
+    return () => {
+      window.removeEventListener('pointerup', handleDragEnd);
+      window.removeEventListener('pointercancel', handleDragEnd);
+    };
+  }, [rightSidebar, setRightSidebarSizePercentage]);
 
   useLayoutEffect(() => {
     const handle = rightHandleRef.current;
@@ -107,11 +141,18 @@ const BuilderPage = () => {
       ? isInitialOpen
         ? SPLIT_MODE_INITIAL_OPEN_SIZE_PX
         : SPLIT_MODE_SIDEBAR_SIZE_PX
-      : DEFAULT_SIDEBAR_SIZE;
+      : isNil(rightSidebarSizePercentage)
+      ? DEFAULT_MIN_SIZE
+      : `${rightSidebarSizePercentage}%`;
     handle.resize(targetSize);
     const rafId = window.requestAnimationFrame(() => handle.resize(targetSize));
     return () => window.cancelAnimationFrame(rafId);
-  }, [prefersSplitLayout, previousRightSidebar, rightSidebar]);
+  }, [
+    prefersSplitLayout,
+    previousRightSidebar,
+    rightSidebar,
+    rightSidebarSizePercentage,
+  ]);
 
   useEffect(() => {
     if (!isSplitForPiece || !isDraggingHandle) return;
@@ -185,7 +226,12 @@ const BuilderPage = () => {
         <ResizableHandle
           disabled={rightSidebar === RightSideBarType.NONE}
           withHandle={rightSidebar !== RightSideBarType.NONE}
-          onPointerDown={() => setIsDraggingHandle(true)}
+          onPointerDown={(event) => {
+            isDraggingHandleRef.current = true;
+            dragStartPointRef.current = { x: event.clientX, y: event.clientY };
+            dragStartedInSplitLayoutRef.current = prefersSplitLayout;
+            setIsDraggingHandle(true);
+          }}
           onPointerUp={() => setIsDraggingHandle(false)}
           onPointerCancel={() => setIsDraggingHandle(false)}
           className={

@@ -166,7 +166,9 @@ describe('buildMessageBlocks — one accordion per segment', () => {
     expect(blocks[0].steps.filter((s) => s.kind === 'tool')).toHaveLength(2);
     if (blocks[1].kind !== 'card-group') throw new Error('expected card-group');
     expect(blocks[1].cards).toHaveLength(2);
-    expect(blocks[1].cards.every((c) => c.kind === 'action-receipt')).toBe(true);
+    expect(blocks[1].cards.every((c) => c.kind === 'action-receipt')).toBe(
+      true,
+    );
   });
 
   it('folds read-only executions into the accordion with no card', () => {
